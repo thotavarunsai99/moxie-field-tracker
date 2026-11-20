@@ -1,69 +1,152 @@
-import Image from "next/image";
+'use client'
+
+import { useState, useMemo } from 'react'
+import { Plus, Search, Bug } from 'lucide-react'
+import { Job } from '@/lib/supabase'
+import { mockJobs } from '@/lib/mock-data'
+import StatsBar from '@/components/StatsBar'
+import JobsTable from '@/components/JobsTable'
+import AddJobModal from '@/components/AddJobModal'
+
+type StatusFilter = Job['status'] | 'all'
 
 export default function Home() {
+  const [jobs, setJobs] = useState<Job[]>(mockJobs)
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [search, setSearch] = useState('')
+  const [showModal, setShowModal] = useState(false)
+
+  const filtered = useMemo(() => {
+    return jobs.filter(job => {
+      const matchesStatus = statusFilter === 'all' || job.status === statusFilter
+      const q = search.toLowerCase()
+      const matchesSearch =
+        !q ||
+        job.customer_name.toLowerCase().includes(q) ||
+        job.technician_name.toLowerCase().includes(q) ||
+        job.address.toLowerCase().includes(q) ||
+        job.service_type.toLowerCase().includes(q)
+      return matchesStatus && matchesSearch
+    })
+  }, [jobs, statusFilter, search])
+
+  const handleStatusChange = (id: string, status: Job['status']) => {
+    setJobs(prev => prev.map(j => j.id === id ? { ...j, status } : j))
+    // With real Supabase:
+    // await supabase.from('jobs').update({ status }).eq('id', id)
+  }
+
+  const handleAddJob = (newJob: Omit<Job, 'id' | 'created_at'>) => {
+    const job: Job = {
+      ...newJob,
+      id: String(Date.now()),
+      created_at: new Date().toISOString(),
+    }
+    setJobs(prev => [job, ...prev])
+    // With real Supabase:
+    // await supabase.from('jobs').insert(job)
+  }
+
+  const filterButtons: { label: string; value: StatusFilter }[] = [
+    { label: 'All', value: 'all' },
+    { label: 'Scheduled', value: 'scheduled' },
+    { label: 'In Progress', value: 'in_progress' },
+    { label: 'Completed', value: 'completed' },
+    { label: 'Cancelled', value: 'cancelled' },
+  ]
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="min-h-screen bg-gray-50">
+      {/* Nav */}
+      <nav className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Bug className="text-green-600" size={22} />
+            <span className="font-bold text-gray-900 text-lg">Moxie Field Tracker</span>
+            <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">
+              Internal
+            </span>
+          </div>
+          <div className="text-sm text-gray-500">Operations Dashboard</div>
+        </div>
+      </nav>
+
+      {/* Main */}
+      <main className="max-w-7xl mx-auto px-6 py-8">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Job Management</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            Track and manage field technician jobs across all service types
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+
+        <StatsBar jobs={jobs} />
+
+        {/* Controls */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-4 p-4 border-b border-gray-100">
+            {/* Search */}
+            <div className="relative">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search customer, technician, address..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg w-72 focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+
+            {/* Filters + Add */}
+            <div className="flex items-center gap-2">
+              <div className="flex gap-1">
+                {filterButtons.map(btn => (
+                  <button
+                    key={btn.value}
+                    onClick={() => setStatusFilter(btn.value)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                      statusFilter === btn.value
+                        ? 'bg-green-600 text-white'
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    {btn.label}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => setShowModal(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs font-medium hover:bg-green-700 transition-colors ml-2"
+              >
+                <Plus size={14} />
+                Add Job
+              </button>
+            </div>
+          </div>
+
+          <div className="p-2">
+            <JobsTable jobs={filtered} onStatusChange={handleStatusChange} />
+          </div>
+
+          <div className="px-4 py-3 border-t border-gray-100 text-xs text-gray-400">
+            Showing {filtered.length} of {jobs.length} jobs
+            {statusFilter !== 'all' && ` · filtered by "${statusFilter}"`}
+            {search && ` · search: "${search}"`}
+          </div>
+        </div>
+
+        {/* Supabase note */}
+        <div className="mt-4 p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-700">
+          <strong>Note:</strong> Currently running with mock data. Connect Supabase by adding{' '}
+          <code className="bg-blue-100 px-1 rounded">NEXT_PUBLIC_SUPABASE_URL</code> and{' '}
+          <code className="bg-blue-100 px-1 rounded">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> to{' '}
+          <code className="bg-blue-100 px-1 rounded">.env.local</code>.
         </div>
       </main>
+
+      {showModal && (
+        <AddJobModal onClose={() => setShowModal(false)} onAdd={handleAddJob} />
+      )}
     </div>
-  );
+  )
 }

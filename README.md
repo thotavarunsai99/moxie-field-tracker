@@ -1,36 +1,73 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Moxie Field Tracker
 
-## Getting Started
+An internal job management dashboard built for Moxie Pest Control field operations teams.
 
-First, run the development server:
+## Tech Stack
+
+- **Next.js 15** (App Router)
+- **TypeScript**
+- **Tailwind CSS**
+- **Supabase** (Postgres + Auth + Row-Level Security)
+- **Vercel** (deployment)
+
+## Features
+
+- Live job list with status badges (Scheduled, In Progress, Completed, Cancelled)
+- KPI stats bar showing job counts by status
+- Search across customer name, technician, address, and service type
+- Filter by status
+- Add new job via modal form
+- Inline status update per job row
+- Supabase-ready: swap mock data for real DB with `.env.local`
+
+## Local Setup
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+App runs at http://localhost:3000
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Connect Supabase
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Create a free project at supabase.com
+2. Run this SQL to create the jobs table:
 
-## Learn More
+```sql
+create table jobs (
+  id uuid default gen_random_uuid() primary key,
+  technician_name text not null,
+  customer_name text not null,
+  address text not null,
+  service_type text not null,
+  status text check (status in ('scheduled','in_progress','completed','cancelled')) default 'scheduled',
+  scheduled_date date not null,
+  notes text,
+  created_at timestamptz default now()
+);
 
-To learn more about Next.js, take a look at the following resources:
+-- Enable Row Level Security
+alter table jobs enable row level security;
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+-- Allow authenticated users to read/write their org's jobs
+create policy "Allow all for authenticated" on jobs
+  for all using (auth.role() = 'authenticated');
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+3. Add your keys to `.env.local`:
 
-## Deploy on Vercel
+```
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+4. Replace mock data calls in `page.tsx` with real Supabase queries (commented stubs already in place)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Deploy to Vercel
+
+```bash
+npx vercel
+```
+
+Add the two env vars in Vercel dashboard under Project Settings > Environment Variables.
