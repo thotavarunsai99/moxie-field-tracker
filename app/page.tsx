@@ -1,9 +1,8 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { Plus, Search, Bug } from 'lucide-react'
-import { Job } from '@/lib/supabase'
-import { mockJobs } from '@/lib/mock-data'
+import { supabase, Job } from '@/lib/supabase'
 import StatsBar from '@/components/StatsBar'
 import JobsTable from '@/components/JobsTable'
 import AddJobModal from '@/components/AddJobModal'
@@ -11,10 +10,25 @@ import AddJobModal from '@/components/AddJobModal'
 type StatusFilter = Job['status'] | 'all'
 
 export default function Home() {
-  const [jobs, setJobs] = useState<Job[]>(mockJobs)
+  const [jobs, setJobs] = useState<Job[]>([])
+  const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [search, setSearch] = useState('')
   const [showModal, setShowModal] = useState(false)
+
+  useEffect(() => {
+    fetchJobs()
+  }, [])
+
+  const fetchJobs = async () => {
+    setLoading(true)
+    const { data, error } = await supabase
+      .from('jobs')
+      .select('*')
+      .order('created_at', { ascending: false })
+    if (!error && data) setJobs(data)
+    setLoading(false)
+  }
 
   const filtered = useMemo(() => {
     return jobs.filter(job => {
@@ -30,21 +44,18 @@ export default function Home() {
     })
   }, [jobs, statusFilter, search])
 
-  const handleStatusChange = (id: string, status: Job['status']) => {
+  const handleStatusChange = async (id: string, status: Job['status']) => {
     setJobs(prev => prev.map(j => j.id === id ? { ...j, status } : j))
-    // With real Supabase:
-    // await supabase.from('jobs').update({ status }).eq('id', id)
+    await supabase.from('jobs').update({ status }).eq('id', id)
   }
 
-  const handleAddJob = (newJob: Omit<Job, 'id' | 'created_at'>) => {
-    const job: Job = {
-      ...newJob,
-      id: String(Date.now()),
-      created_at: new Date().toISOString(),
-    }
-    setJobs(prev => [job, ...prev])
-    // With real Supabase:
-    // await supabase.from('jobs').insert(job)
+  const handleAddJob = async (newJob: Omit<Job, 'id' | 'created_at'>) => {
+    const { data, error } = await supabase
+      .from('jobs')
+      .insert(newJob)
+      .select()
+      .single()
+    if (!error && data) setJobs(prev => [data, ...prev])
   }
 
   const filterButtons: { label: string; value: StatusFilter }[] = [
@@ -57,7 +68,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Nav */}
       <nav className="bg-white border-b border-gray-200 px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -71,7 +81,6 @@ export default function Home() {
         </div>
       </nav>
 
-      {/* Main */}
       <main className="max-w-7xl mx-auto px-6 py-8">
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">Job Management</h1>
@@ -82,10 +91,8 @@ export default function Home() {
 
         <StatsBar jobs={jobs} />
 
-        {/* Controls */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-4 p-4 border-b border-gray-100">
-            {/* Search */}
             <div className="relative">
               <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
@@ -97,7 +104,6 @@ export default function Home() {
               />
             </div>
 
-            {/* Filters + Add */}
             <div className="flex items-center gap-2">
               <div className="flex gap-1">
                 {filterButtons.map(btn => (
@@ -125,7 +131,11 @@ export default function Home() {
           </div>
 
           <div className="p-2">
-            <JobsTable jobs={filtered} onStatusChange={handleStatusChange} />
+            {loading ? (
+              <div className="text-center py-16 text-gray-400 text-sm">Loading jobs...</div>
+            ) : (
+              <JobsTable jobs={filtered} onStatusChange={handleStatusChange} />
+            )}
           </div>
 
           <div className="px-4 py-3 border-t border-gray-100 text-xs text-gray-400">
@@ -133,14 +143,6 @@ export default function Home() {
             {statusFilter !== 'all' && ` · filtered by "${statusFilter}"`}
             {search && ` · search: "${search}"`}
           </div>
-        </div>
-
-        {/* Supabase note */}
-        <div className="mt-4 p-3 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-700">
-          <strong>Note:</strong> Currently running with mock data. Connect Supabase by adding{' '}
-          <code className="bg-blue-100 px-1 rounded">NEXT_PUBLIC_SUPABASE_URL</code> and{' '}
-          <code className="bg-blue-100 px-1 rounded">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> to{' '}
-          <code className="bg-blue-100 px-1 rounded">.env.local</code>.
         </div>
       </main>
 
